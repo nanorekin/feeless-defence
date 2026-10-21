@@ -1,0 +1,1118 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Feeless Defence</title>
+<meta name="description" content="A daily tower defence game. Protect the Nano ledger from spam. New map every day, free, no fees.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root, :root[data-theme="deep"] {
+  --bg:#0b1220; --card:#121c30; --ink:#e7eefc; --muted:#93a3c0; --line:#24334f;
+  --accent:#4ea1ff; --accent-ink:#04101f; --field:#0e1729; --path:#1d2d4b;
+  --bad:#ff6b6b; --good:#4ade80; --gold:#fbbf24; --scrim:rgba(4,9,20,0.76); color-scheme:dark;
+}
+:root[data-theme="daylight"] {
+  --bg:#eef2f8; --card:#ffffff; --ink:#0e1a2e; --muted:#55627a; --line:#d3dbe8;
+  --accent:#2563d9; --accent-ink:#ffffff; --field:#e3eaf6; --path:#c3cfe6;
+  --bad:#d1453b; --good:#16a34a; --gold:#b45309; --scrim:rgba(14,26,46,0.55); color-scheme:light;
+}
+:root[data-theme="blueprint"] {
+  --bg:#0a2540; --card:#0f3558; --ink:#e3f0ff; --muted:#9fbddb; --line:#24527f;
+  --accent:#7cc4ff; --accent-ink:#06223d; --field:#0b2e4d; --path:#1f5382;
+  --bad:#ff9a8f; --good:#7dffb0; --gold:#ffd166; --scrim:rgba(5,25,45,0.76); color-scheme:dark;
+}
+:root[data-theme="terminal"] {
+  --bg:#040704; --card:#091309; --ink:#7dff8a; --muted:#4fae59; --line:#1c3a20;
+  --accent:#7dff8a; --accent-ink:#031003; --field:#050c05; --path:#123016;
+  --bad:#ff5c5c; --good:#b6ff4a; --gold:#e6ff6b; --scrim:rgba(2,8,2,0.8); color-scheme:dark;
+}
+:root[data-theme="sunset"] {
+  --bg:#2a1020; --card:#3a1830; --ink:#ffe9dc; --muted:#d9a9a0; --line:#5e2b48;
+  --accent:#ff9f5a; --accent-ink:#2a0f05; --field:#2f1226; --path:#55253f;
+  --bad:#ff6b8b; --good:#8ef0b0; --gold:#ffd166; --scrim:rgba(30,8,22,0.78); color-scheme:dark;
+}
+* { box-sizing:border-box; }
+html { background:var(--bg); }
+body {
+  margin:0; background:var(--bg); color:var(--ink);
+  font:16px/1.5 "Sora","Helvetica Neue",Arial,sans-serif;
+  padding-inline:16px; padding-block:12px 40px; -webkit-text-size-adjust:100%;
+}
+[hidden] { display:none !important; }
+.layout { max-width:980px; margin-inline:auto; display:grid; grid-template-columns:minmax(0,1fr); gap:24px; align-items:start; }
+@media (min-width:900px) { .layout { grid-template-columns:minmax(0,440px) minmax(0,1fr); } }
+.layout > * { min-width:0; }
+.mono { font-family:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace; font-variant-numeric:tabular-nums; }
+
+button, .btn {
+  font:600 0.9rem "Sora","Helvetica Neue",Arial,sans-serif; cursor:pointer; text-decoration:none;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:8px 14px; min-height:44px; border-radius:6px; border:1px solid var(--line);
+  background:var(--card); color:var(--ink); touch-action:manipulation; line-height:1.2;
+}
+button:disabled { opacity:0.45; cursor:not-allowed; }
+button.primary, .btn.primary { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:800; }
+button.danger { background:var(--bad); border-color:var(--bad); color:var(--accent-ink); font-weight:800; }
+button[aria-pressed="true"] { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+button.primary[aria-pressed="true"] { box-shadow:none; }
+button:focus-visible, .btn:focus-visible, canvas:focus-visible, summary:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+
+/* One-screen layout: title row, twist line, stats, map, tower bar, info strip, controls */
+.stage { display:flex; flex-direction:column; gap:6px; width:100%; max-width:440px; margin-inline:auto; }
+@media (min-width:900px) { .stage { margin-inline:0; } }
+.topbar { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.topbar h1 { margin:0; font-weight:800; font-size:1.2rem; line-height:1.1; letter-spacing:-0.01em; white-space:nowrap; }
+.topbar .sup { color:var(--gold); font-size:0.9em; }
+.modes { display:flex; gap:6px; }
+.modes button { min-height:36px; padding:4px 12px; font-size:0.82rem; gap:0; }
+.mod { font-size:0.76rem; line-height:1.25; color:var(--muted); padding-inline:2px; }
+.mod b { color:var(--gold); font-weight:600; }
+.hud { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.hud div { display:flex; justify-content:space-between; align-items:baseline; gap:6px; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:4px 10px; }
+.hud small { color:var(--muted); font-size:0.64rem; text-transform:uppercase; letter-spacing:0.08em; }
+.hud b { font-family:"JetBrains Mono",monospace; font-size:1.05rem; font-weight:600; font-variant-numeric:tabular-nums; }
+#h-lives b { color:var(--bad); }
+#h-raw b { color:var(--gold); }
+.board { position:relative; margin-inline:auto; width:100%; aspect-ratio:352/396; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--field); }
+canvas { display:block; width:100%; height:100%; touch-action:manipulation; }
+.tools { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
+.tools button { flex-direction:column; gap:1px; padding:4px 2px; min-height:48px; }
+.tn { display:inline-flex; align-items:center; gap:5px; font-size:0.78rem; font-weight:800; }
+.dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.tc { font-family:"JetBrains Mono",monospace; font-size:0.78rem; font-weight:600; color:var(--gold); }
+.tools button.poor .tc { color:var(--bad); }
+.info { min-height:78px; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 12px; display:flex; flex-direction:column; justify-content:center; gap:6px; }
+.info.warn { border-color:var(--bad); }
+.info .t { font-size:0.84rem; line-height:1.3; }
+.info .t b { font-weight:800; }
+.info .s { font-size:0.76rem; line-height:1.3; color:var(--muted); }
+.info .acts { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.info .acts button { min-height:36px; padding:4px 10px; font-size:0.84rem; }
+.info .tr { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.info .tt { font-size:0.86rem; font-weight:800; white-space:nowrap; }
+.info .acts2 { display:flex; gap:6px; }
+.info .acts2 button { min-height:36px; padding:4px 10px; font-size:0.82rem; white-space:nowrap; }
+.ctl { display:grid; grid-template-columns:minmax(0,1.6fr) repeat(3,minmax(0,1fr)); gap:6px; }
+.ctl button { padding:6px 6px; font-size:0.84rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:12px; background:var(--scrim); }
+.sheet { width:100%; max-width:300px; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; display:flex; flex-direction:column; gap:10px; }
+.sheet h2 { margin:0; font-weight:800; font-size:1.15rem; line-height:1.2; text-wrap:balance; }
+.sheet p { margin:0; color:var(--muted); font-size:0.84rem; line-height:1.4; }
+.sheet .big { font-family:"JetBrains Mono",monospace; font-weight:600; font-size:2.1rem; line-height:1; }
+.sheet .newbest { color:var(--gold); font-weight:800; font-size:0.8rem; }
+.sheet .stack { display:flex; flex-direction:column; gap:8px; }
+.sheet .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.sheet .status { min-height:1.2em; font-size:0.78rem; color:var(--accent); }
+
+.rest { display:flex; flex-direction:column; gap:24px; }
+.card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:20px; display:flex; flex-direction:column; gap:14px; }
+.card h2 { font-weight:800; font-size:1.25rem; margin:0; line-height:1.15; }
+.card p { margin:0; color:var(--muted); font-size:0.92rem; }
+.stats { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+.stat { background:var(--field); border:1px solid var(--line); border-radius:6px; padding:8px 10px; display:flex; flex-direction:column; }
+.stat small { color:var(--muted); font-size:0.72rem; }
+.stat b { font-family:"JetBrains Mono",monospace; font-size:1.3rem; font-weight:600; }
+.badges { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:8px; }
+.badge { border:1px solid var(--line); border-radius:6px; padding:8px; font-size:0.78rem; background:var(--field); color:var(--muted); display:flex; flex-direction:column; gap:2px; }
+.badge b { font-size:0.88rem; color:var(--ink); }
+.badge.off { opacity:0.55; }
+.badge.on { border-color:var(--gold); }
+.themes { display:flex; flex-wrap:wrap; gap:8px; }
+.themes button { flex-direction:column; align-items:flex-start; gap:0; padding:8px 12px; }
+.themes small { color:var(--muted); font-weight:500; font-size:0.7rem; }
+.amounts { display:flex; flex-wrap:wrap; gap:8px; }
+.amounts button { font-family:"JetBrains Mono",monospace; font-size:0.85rem; }
+.pay { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
+.qr { background:#fff; padding:10px; border-radius:6px; line-height:0; flex:none; }
+.qr img, .qr canvas { max-width:100%; height:auto; }
+.addr-box { flex:1 1 200px; min-width:0; display:flex; flex-direction:column; gap:10px; }
+.addr { font-family:"JetBrains Mono",monospace; font-size:0.78rem; word-break:break-all; user-select:all; background:var(--field); border:1px solid var(--line); border-radius:6px; padding:10px; }
+.row { display:flex; flex-wrap:wrap; gap:8px; }
+.hint { font-size:0.82rem; color:var(--muted); margin:0; }
+.status { font-size:0.85rem; min-height:1.3em; color:var(--accent); }
+.rules { border:1px solid var(--line); border-radius:8px; background:var(--card); }
+.rules summary { cursor:pointer; padding:12px 14px; font-weight:800; }
+.rules-body { padding:0 14px 14px; display:flex; flex-direction:column; gap:10px; font-size:0.86rem; color:var(--muted); }
+.rules-body h3 { margin:6px 0 0; font-family:"JetBrains Mono",monospace; font-size:0.74rem; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink); }
+.rules-body p { margin:0; }
+footer { color:var(--muted); font-size:0.8rem; }
+@media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }
+</style></head>
+<body>
+<noscript><p style="padding:16px">Feeless Defence needs JavaScript to run.</p></noscript>
+<div class="layout">
+  <main class="stage" id="stage">
+    <div class="topbar">
+      <h1>Feeless Defence <span class="sup" id="supmark" hidden title="Supporter">&#10022;</span></h1>
+      <div class="modes" role="group" aria-label="Mode">
+        <button type="button" id="m-daily" aria-pressed="true">Daily #<span id="dayno">1</span></button>
+        <button type="button" id="m-practice" aria-pressed="false">Practice</button>
+      </div>
+    </div>
+    <div class="mod" id="modbox"></div>
+    <div class="hud">
+      <div id="h-lives"><small>Integrity</small><b>20</b></div>
+      <div id="h-raw"><small>Raw</small><b>0</b></div>
+      <div id="h-wave"><small>Wave</small><b>0</b></div>
+    </div>
+
+    <div class="board" id="board">
+      <canvas id="cv" width="704" height="792" tabindex="0" aria-label="Game map. Tap a tile to build or select. With a keyboard: arrow keys move the cursor, 1 to 4 choose a tower, Enter builds, U upgrades, S sells, N starts the next wave, P pauses."></canvas>
+
+      <div class="overlay" id="ov-pause" role="dialog" aria-modal="true" aria-labelledby="p-title" hidden>
+        <div class="sheet">
+          <h2 id="p-title">Paused</h2>
+          <p id="p-text">Your run is on hold.</p>
+          <div class="stack">
+            <button type="button" class="primary" id="p-resume">Resume</button>
+            <button type="button" id="p-restart">Restart this map</button>
+            <button type="button" id="p-newmap" hidden>New random map</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="ov-over" role="dialog" aria-modal="true" aria-labelledby="o-title" hidden>
+        <div class="sheet">
+          <h2 id="o-title">The ledger was breached</h2>
+          <div class="big" id="o-wave">Wave 0</div>
+          <div class="newbest" id="o-new" hidden>New best for today</div>
+          <p id="o-text"></p>
+          <div class="stack">
+            <button type="button" class="primary" id="o-again">Try again</button>
+            <div class="row2">
+              <button type="button" id="o-share">Share</button>
+              <button type="button" id="o-tip">Tip 0.01 XNO</button>
+            </div>
+            <button type="button" id="o-newmap" hidden>New random map</button>
+          </div>
+          <div class="status" id="o-status" role="status"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tools" id="tools" role="group" aria-label="Choose a tower to build"></div>
+    <div class="info" id="info" aria-live="polite"></div>
+    <div class="ctl">
+      <button type="button" class="primary" id="wave">Start wave 1</button>
+      <button type="button" id="speed" aria-label="Game speed">x1</button>
+      <button type="button" id="pause">Pause</button>
+      <button type="button" id="auto" aria-pressed="false">Auto</button>
+    </div>
+  </main>
+
+  <div class="rest">
+    <details class="rules" id="rules">
+      <summary>How to play</summary>
+      <div class="rules-body">
+        <h3>Goal</h3>
+        <p>Enemies walk the path from the top to the ledger at the bottom. Each one that gets through costs Integrity. At 0 the ledger is breached and the run ends. Survive as many waves as you can.</p>
+        <h3>Building</h3>
+        <p>Pick a tower in the bar under the map, then tap empty tiles to build as many as you can afford. Tap the same tower again to stop building. Tap a tower on the map to see its range and to upgrade it (up to level 4) or sell it for 60% of what you spent. Selling asks you to confirm. Tiles between two lanes are the best spots because they cover both. Towers cannot go on the path.</p>
+        <h3>Towers</h3>
+        <p><b>Node</b>: fast and cheap. <b>Rep</b>: long range, hits hard, slow. <b>Pruner</b>: splash damage, great against swarms. <b>Throttle</b>: slows enemies so everything else hits more often.</p>
+        <h3>Enemies</h3>
+        <p><b>Dust</b> comes in swarms. <b>Spam</b> is the all-rounder. <b>Bots</b> are slow and tough and cost 2 Integrity. Every 5th wave an <b>Audit</b> boss arrives and costs 8 Integrity if it gets through.</p>
+        <h3>Raw</h3>
+        <p>Raw is the in-game money you earn from kills and from clearing waves. It has nothing to do with real XNO. Money is tight, so choose between a new tower and an upgrade.</p>
+        <h3>Daily</h3>
+        <p>The map and the twist change at 00:00 UTC and are the same for everyone. Reach wave 5 to keep your daily streak. You can retry as often as you like and your best wave for the day is kept.</p>
+        <h3>Pause</h3>
+        <p>Pause opens a menu where you can resume or restart the map. The game also pauses when you switch away from the page.</p>
+        <h3>Keyboard</h3>
+        <p>Arrow keys move the cursor, 1 to 4 choose a tower, Enter builds, U upgrades, S sells (then Y to confirm), N starts the wave, P pauses, Esc cancels.</p>
+      </div>
+    </details>
+
+    <section class="card" aria-label="Your stats">
+      <h2>Your stats</h2>
+      <div class="stats">
+        <div class="stat"><small>Daily streak</small><b id="s-streak">0</b></div>
+        <div class="stat"><small>Best streak</small><b id="s-bstreak">0</b></div>
+        <div class="stat"><small>Today's best wave</small><b id="s-today">0</b></div>
+        <div class="stat"><small>All-time best wave</small><b id="s-all">0</b></div>
+      </div>
+      <p id="s-next"></p>
+    </section>
+
+    <section class="card" aria-label="Badges">
+      <h2>Badges</h2>
+      <div class="badges" id="badges"></div>
+      <p id="badge-note"></p>
+    </section>
+
+    <section class="card" aria-label="Themes">
+      <h2>Themes</h2>
+      <div class="themes" id="themes" role="group" aria-label="Themes"></div>
+      <p id="theme-note"></p>
+    </section>
+
+    <aside class="card" id="tip" aria-label="Tip the author">
+      <h2>Enjoyed it? Send some XNO.</h2>
+      <p>Tips are optional and go straight to the creator's Nano wallet. Transfers settle in seconds with no fee. A tip of 0.01 XNO or more unlocks the supporter themes.</p>
+      <div class="amounts" role="group" aria-label="Amount">
+        <button type="button" data-amt="0.01" aria-pressed="true">0.01 XNO</button>
+        <button type="button" data-amt="0.05" aria-pressed="false">0.05 XNO</button>
+        <button type="button" data-amt="0.1" aria-pressed="false">0.1 XNO</button>
+        <button type="button" data-amt="" aria-pressed="false">Any amount</button>
+      </div>
+      <div class="pay">
+        <div class="qr" id="qr"></div>
+        <div class="addr-box">
+          <a class="btn primary" id="openw" href="#">Open in wallet</a>
+          <div class="addr" id="addr"></div>
+          <div class="row">
+            <button type="button" id="copy">Copy address</button>
+            <button type="button" id="check">I've sent it, check</button>
+          </div>
+          <div class="status" id="tstatus" role="status"></div>
+          <p class="hint" id="thint"></p>
+        </div>
+      </div>
+    </aside>
+
+    <footer>Only send XNO to the address shown above. Transfers on the Nano network cannot be reversed.</footer>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = function (id) { return document.getElementById(id); };
+  const NANO_ADDRESS = "nano_3a7e3irpbpxbh1n7dk9u3cm9tnd97q1unjxn67ni9gijoxfmzguitx1xgc9u";
+  // Public Nano node RPC endpoints used only to check for a tip. Swap in your own proxy if these block browsers.
+  const RPCS = ["https://rpc.nano.to", "https://node.somenano.com/proxy"];
+  function lsGet(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+  function jget(k, d) { try { const v = JSON.parse(lsGet(k, "")); return v === null || v === undefined ? d : v; } catch (e) { return d; } }
+
+/* <logic> */
+const COLS = 8, ROWS = 9, CS = 44;
+function xmur3(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  return function () { h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); h ^= h >>> 16; return h >>> 0; };
+}
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const TOWERS = {
+  node:     { name: "Node",     cost: 50,  range: 84,  rate: 1.5,  dmg: 7,  col: "#4ea1ff", desc: "Fast and cheap. A solid all-rounder." },
+  rep:      { name: "Rep",      cost: 100, range: 150, rate: 0.55, dmg: 34, col: "#c084fc", desc: "Long range, heavy hits, slow shots." },
+  prune:    { name: "Pruner",   cost: 120, range: 74,  rate: 0.9,  dmg: 7,  splash: 36, col: "#fb923c", desc: "Splash damage. Great against swarms." },
+  throttle: { name: "Throttle", cost: 75,  range: 80,  rate: 1.1,  dmg: 2,  slow: 0.55, slowT: 1.6, col: "#2dd4bf", desc: "Slows enemies down. Low damage." }
+};
+const TKEYS = ["node", "rep", "prune", "throttle"];
+const ENEMIES = {
+  dust:  { name: "Dust",  hp: 7,   spd: 74, reward: 1,  leak: 1,  gap: 0.38 },
+  spam:  { name: "Spam",  hp: 22,  spd: 54, reward: 3,  leak: 1,  gap: 0.7 },
+  bot:   { name: "Bot",   hp: 80,  spd: 36, reward: 8,  leak: 2,  gap: 1.2 },
+  whale: { name: "Audit", hp: 550, spd: 28, reward: 60, leak: 8,  gap: 2.5 }
+};
+const MODS = [
+  { id: "plain", name: "Clean books",    desc: "No twist today." },
+  { id: "rush",  name: "Rush hour",      desc: "Enemies move 20% faster.", spdMul: 1.2 },
+  { id: "armor", name: "Armoured bots",  desc: "Bots have 50% more HP.", botHp: 1.5 },
+  { id: "swarm", name: "Swarm",          desc: "Twice as much dust.", dustMul: 2 },
+  { id: "bull",  name: "Bull market",    desc: "+50% start raw, enemies +15% HP.", startRaw: 188, hpMul: 1.15 },
+  { id: "bear",  name: "Bear market",    desc: "Towers 20% cheaper, kills pay 30% less.", costMul: 0.8, rewardMul: 0.7 }
+];
+function makePath(rng) {
+  const lanes = [1, 3, 5, 7];
+  let col = 1 + Math.floor(rng() * (COLS - 2));
+  const wp = [{ c: col, r: -1 }, { c: col, r: 1 }];
+  for (let k = 0; k < lanes.length; k++) {
+    let nc; do { nc = Math.floor(rng() * COLS); } while (Math.abs(nc - col) < 3);
+    wp.push({ c: nc, r: lanes[k] }); col = nc;
+    wp.push({ c: col, r: k < lanes.length - 1 ? lanes[k + 1] : ROWS });
+  }
+  const set = new Set();
+  for (let i = 0; i < wp.length - 1; i++) {
+    const a = wp[i], b = wp[i + 1], dc = Math.sign(b.c - a.c), dr = Math.sign(b.r - a.r);
+    let c = a.c, r = a.r;
+    for (;;) {
+      if (r >= 0 && r < ROWS && c >= 0 && c < COLS) set.add(c + "," + r);
+      if (c === b.c && r === b.r) break;
+      c += dc; r += dr;
+    }
+  }
+  const pts = wp.map(function (p) { return { x: p.c * CS + CS / 2, y: p.r * CS + CS / 2 }; });
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+  return { pts: pts, cum: cum, len: cum[cum.length - 1], set: set, entry: wp[0].c, exit: wp[wp.length - 1].c };
+}
+function posAt(path, d) {
+  const cum = path.cum, pts = path.pts;
+  d = Math.max(0, Math.min(path.len, d));
+  let i = 1; while (i < cum.length - 1 && cum[i] < d) i++;
+  const t = (d - cum[i - 1]) / (cum[i] - cum[i - 1]);
+  return { x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t, y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t };
+}
+function newGame(seedStr) {
+  const rng = mulberry32(xmur3(seedStr)());
+  const path = makePath(rng);
+  const mod = MODS[Math.floor(rng() * MODS.length)];
+  return {
+    seed: seedStr, path: path, mod: mod, raw: mod.startRaw || 125, lives: 20, wave: 0,
+    towers: [], enemies: [], bullets: [], queue: [], waveT: 0, active: false, over: false,
+    kills: 0, whales: 0, leaks: 0, nextId: 1, time: 0, events: [], cleared: 0
+  };
+}
+function towerCost(g, k) { return Math.round(TOWERS[k].cost * (g.mod.costMul || 1)); }
+function upgradeCost(g, tw) { return Math.round(TOWERS[tw.k].cost * (g.mod.costMul || 1) * (1.0 + 0.6 * tw.lvl)); }
+function sellValue(tw) { return Math.floor(tw.spent * 0.6); }
+function tstat(tw) {
+  const T = TOWERS[tw.k], L = tw.lvl;
+  return {
+    dmg: T.dmg * (1 + 0.7 * L), range: T.range * (1 + 0.08 * L), rate: T.rate * (1 + 0.12 * L),
+    splash: T.splash ? T.splash * (1 + 0.1 * L) : 0,
+    sf: T.slow ? Math.max(0.25, T.slow - 0.08 * L) : 1, st: T.slowT ? T.slowT + 0.3 * L : 0
+  };
+}
+function towerAt(g, c, r) { for (let i = 0; i < g.towers.length; i++) if (g.towers[i].c === c && g.towers[i].r === r) return g.towers[i]; return null; }
+function canPlace(g, c, r) {
+  return c >= 0 && c < COLS && r >= 0 && r < ROWS && !g.path.set.has(c + "," + r) && !towerAt(g, c, r);
+}
+function place(g, k, c, r) {
+  if (g.over || !canPlace(g, c, r)) return null;
+  const cost = towerCost(g, k);
+  if (g.raw < cost) return null;
+  g.raw -= cost;
+  const tw = { id: g.nextId++, k: k, c: c, r: r, x: c * CS + CS / 2, y: r * CS + CS / 2, lvl: 0, cd: 0, spent: cost, aim: -Math.PI / 2 };
+  g.towers.push(tw); return tw;
+}
+function upgrade(g, tw) {
+  if (g.over || tw.lvl >= 3) return false;
+  const cost = upgradeCost(g, tw);
+  if (g.raw < cost) return false;
+  g.raw -= cost; tw.spent += cost; tw.lvl++; return true;
+}
+function sell(g, tw) {
+  const i = g.towers.indexOf(tw); if (i < 0) return 0;
+  const v = sellValue(tw); g.towers.splice(i, 1); g.raw += v; return v;
+}
+function buildWave(g, w) {
+  const rng = mulberry32(xmur3(g.seed + "|w" + w)());
+  const m = g.mod, mix = [];
+  const ramp = Math.min(1, 0.5 + 0.2 * w);
+  const dust = Math.round((6 + w * 1.7) * ramp * (m.dustMul || 1));
+  const spam = w >= 2 ? Math.round((2 + w * 1.2) * ramp) : 0;
+  const bot = w >= 4 ? Math.floor((w - 1) / 3) : 0;
+  const whale = w % 5 === 0 ? Math.ceil(w / 10) : 0;
+  for (let i = 0; i < dust; i++) mix.push("dust");
+  for (let i = 0; i < spam; i++) mix.push("spam");
+  for (let i = 0; i < bot; i++) mix.push("bot");
+  for (let i = mix.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = mix[i]; mix[i] = mix[j]; mix[j] = t; }
+  const q = []; let at = 0.4;
+  mix.forEach(function (type) { q.push({ at: at, type: type }); at += ENEMIES[type].gap; });
+  if (whale) { at += 2; for (let i = 0; i < whale; i++) { q.push({ at: at, type: "whale" }); at += ENEMIES.whale.gap; } }
+  return q;
+}
+function startWave(g) {
+  if (g.active || g.over) return false;
+  g.wave++; g.queue = buildWave(g, g.wave); g.waveT = 0; g.active = true; return true;
+}
+function spawn(g, type) {
+  const E = ENEMIES[type], w = g.wave, m = g.mod;
+  let hp = E.hp * Math.pow(1.12, w - 1) * (m.hpMul || 1);
+  if (type === "bot") hp *= (m.botHp || 1);
+  const spd = E.spd * (m.spdMul || 1) * (1 + Math.min(0.3, (w - 1) * 0.01));
+  const p = posAt(g.path, 0);
+  g.enemies.push({ id: g.nextId++, type: type, hp: hp, max: hp, d: 0, spd: spd, slow: 0, sf: 1, x: p.x, y: p.y,
+    reward: Math.max(1, E.reward * (1 + 0.04 * (w - 1)) * (m.rewardMul || 1)), leak: E.leak, dead: false });
+}
+function damage(g, e, d) {
+  if (e.dead) return;
+  e.hp -= d;
+  if (e.hp <= 0) {
+    e.dead = true; const v = Math.max(1, Math.round(e.reward));
+    g.raw += v; g.kills++; if (e.type === "whale") g.whales++;
+    g.events.push({ k: "kill", x: e.x, y: e.y, v: v });
+  }
+}
+function hitBullet(g, b) {
+  const tx = b.t.x, ty = b.t.y;
+  const list = b.splash ? g.enemies.filter(function (e) { return !e.dead && Math.hypot(e.x - tx, e.y - ty) <= b.splash; }) : [b.t];
+  list.forEach(function (e) {
+    damage(g, e, b.dmg);
+    if (b.st && !e.dead) { e.slow = b.st; e.sf = b.sf; }
+  });
+  if (b.splash) g.events.push({ k: "boom", x: tx, y: ty, r: b.splash });
+}
+function step(g, dt) {
+  if (g.over) return;
+  g.time += dt;
+  if (g.active) {
+    g.waveT += dt;
+    while (g.queue.length && g.queue[0].at <= g.waveT) spawn(g, g.queue.shift().type);
+  }
+  for (let i = 0; i < g.enemies.length; i++) {
+    const e = g.enemies[i];
+    if (e.dead) continue;
+    let f = 1; if (e.slow > 0) { e.slow -= dt; f = e.sf; }
+    e.d += e.spd * f * dt;
+    if (e.d >= g.path.len) {
+      e.dead = true; g.lives -= e.leak; g.leaks++;
+      g.events.push({ k: "leak", x: e.x, y: e.y, v: e.leak });
+      if (g.lives <= 0) { g.lives = 0; g.over = true; }
+    } else { const p = posAt(g.path, e.d); e.x = p.x; e.y = p.y; }
+  }
+  for (let i = 0; i < g.towers.length; i++) {
+    const tw = g.towers[i];
+    tw.cd -= dt; if (tw.cd > 0) continue;
+    const s = tstat(tw); let best = null, bd = -1;
+    for (let j = 0; j < g.enemies.length; j++) {
+      const e = g.enemies[j]; if (e.dead) continue;
+      const dx = e.x - tw.x, dy = e.y - tw.y;
+      if (dx * dx + dy * dy <= s.range * s.range && e.d > bd) { best = e; bd = e.d; }
+    }
+    if (best) {
+      tw.cd += 1 / s.rate; if (tw.cd < 0) tw.cd = 0;
+      tw.aim = Math.atan2(best.y - tw.y, best.x - tw.x);
+      g.bullets.push({ x: tw.x, y: tw.y, t: best, dmg: s.dmg, splash: s.splash, sf: s.sf, st: s.st, col: TOWERS[tw.k].col });
+    } else tw.cd = 0;
+  }
+  for (let i = 0; i < g.bullets.length; i++) {
+    const b = g.bullets[i];
+    if (b.t.dead) { b.done = true; continue; }
+    const dx = b.t.x - b.x, dy = b.t.y - b.y, dist = Math.hypot(dx, dy), mv = 380 * dt;
+    if (dist <= mv + 4) { hitBullet(g, b); b.done = true; } else { b.x += dx / dist * mv; b.y += dy / dist * mv; }
+  }
+  g.bullets = g.bullets.filter(function (b) { return !b.done; });
+  g.enemies = g.enemies.filter(function (e) { return !e.dead; });
+  if (g.active && !g.over && g.queue.length === 0 && g.enemies.length === 0) {
+    g.active = false; g.cleared = g.wave; g.raw += 14 + 2 * g.wave;
+    g.events.push({ k: "clear", w: g.wave });
+  }
+}
+function dateKey(d) { return (d || new Date()).toISOString().slice(0, 10); }
+const EPOCH = Date.UTC(2026, 9, 20);
+function dayNumber(key) { return Math.max(1, Math.floor((Date.parse(key + "T00:00:00Z") - EPOCH) / 86400000) + 1); }
+/* </logic> */
+
+  // ---------- storage ----------
+  const BADGES = [
+    { id: "w5", name: "Holding on", d: "Reach wave 5" },
+    { id: "w10", name: "Double digits", d: "Reach wave 10" },
+    { id: "w20", name: "Unbreakable", d: "Reach wave 20" },
+    { id: "boss", name: "Auditor", d: "Stop an Audit boss" },
+    { id: "max", name: "Fully synced", d: "Upgrade a tower to level 4" },
+    { id: "clean", name: "Clean sheet", d: "Reach wave 6 without a leak" },
+    { id: "streak3", name: "Regular", d: "A 3-day streak" },
+    { id: "streak7", name: "Resident", d: "A 7-day streak" },
+    { id: "supporter", name: "Supporter", d: "Send a tip" }
+  ];
+  let gotB = jget("fd-badges", []); if (!Array.isArray(gotB)) gotB = [];
+  let toastMsg = null;
+  function renderBadges() {
+    const box = $("badges"); box.textContent = "";
+    BADGES.forEach(function (b) {
+      const on = gotB.indexOf(b.id) >= 0;
+      const d = document.createElement("div"); d.className = "badge " + (on ? "on" : "off");
+      const n = document.createElement("b"); n.textContent = b.name;
+      const t = document.createElement("span"); t.textContent = on ? "Earned" : b.d;
+      d.appendChild(n); d.appendChild(t); box.appendChild(d);
+    });
+    $("badge-note").textContent = gotB.length + " of " + BADGES.length + " earned. Saved on this device.";
+  }
+  function award(id) {
+    if (gotB.indexOf(id) >= 0) return;
+    gotB.push(id); lsSet("fd-badges", JSON.stringify(gotB)); renderBadges();
+    const b = BADGES.filter(function (x) { return x.id === id; })[0];
+    toastMsg = { text: "BADGE: " + b.name, t: 2.4 };
+  }
+  let stats = jget("fd-stats", {});
+  stats = { streak: stats.streak | 0, bstreak: stats.bstreak | 0, last: stats.last || "", all: stats.all | 0, runs: stats.runs | 0 };
+  function saveStats() { lsSet("fd-stats", JSON.stringify(stats)); }
+  function yesterdayKey() { return dateKey(new Date(Date.now() - 86400000)); }
+  function currentStreak() { const t = dateKey(); return (stats.last === t || stats.last === yesterdayKey()) ? stats.streak : 0; }
+  function bestToday() { return parseInt(lsGet("fd-best-" + dateKey(), "0"), 10) || 0; }
+  function renderStats() {
+    $("s-streak").textContent = currentStreak();
+    $("s-bstreak").textContent = stats.bstreak;
+    $("s-today").textContent = bestToday();
+    $("s-all").textContent = stats.all;
+    $("s-next").textContent = stats.last === dateKey()
+      ? "Today's goal is done. Come back tomorrow to keep the streak."
+      : "Reach wave 5 in today's daily to " + (currentStreak() ? "extend your streak." : "start a streak.");
+  }
+
+  // ---------- themes, supporter ----------
+  let supporter = lsGet("fd-sup", "0") === "1";
+  const THEMES = [
+    { id: "deep", name: "Deep", free: true }, { id: "daylight", name: "Daylight", free: true },
+    { id: "blueprint", name: "Blueprint" }, { id: "terminal", name: "Terminal" }, { id: "sunset", name: "Sunset" }
+  ];
+  let theme = lsGet("fd-theme", "deep");
+  function themeOk(id) { const t = THEMES.filter(function (x) { return x.id === id; })[0]; return !!t && (t.free || supporter); }
+  if (!themeOk(theme)) theme = "deep";
+  const C = {};
+  function readColors() {
+    const cs = getComputedStyle(document.documentElement);
+    ["--accent", "--accent-ink", "--field", "--path", "--bad", "--good", "--gold", "--ink", "--muted", "--line"].forEach(function (k) { C[k] = cs.getPropertyValue(k).trim(); });
+  }
+  function applyTheme() { document.documentElement.setAttribute("data-theme", theme); readColors(); }
+  function renderThemes() {
+    const box = $("themes"); box.textContent = "";
+    THEMES.forEach(function (t) {
+      const ok = themeOk(t.id);
+      const b = document.createElement("button"); b.type = "button";
+      b.disabled = !ok; b.setAttribute("aria-pressed", t.id === theme ? "true" : "false");
+      const n = document.createElement("span"); n.textContent = t.name;
+      const s = document.createElement("small"); s.textContent = t.free ? "Free" : (supporter ? "Supporter" : "Supporters");
+      b.appendChild(n); b.appendChild(s);
+      b.addEventListener("click", function () { theme = t.id; lsSet("fd-theme", theme); applyTheme(); renderThemes(); });
+      box.appendChild(b);
+    });
+    $("theme-note").textContent = supporter ? "Thank you for supporting the game." : "Tip 0.01 XNO or more to unlock the supporter themes.";
+    $("supmark").hidden = !supporter;
+  }
+  applyTheme(); renderThemes(); renderBadges(); renderStats();
+
+  // ---------- game state ----------
+  const W = COLS * CS, H = ROWS * CS;
+  const cv = $("cv"), ctx = cv.getContext("2d");
+  ctx.scale(2, 2);
+  let g, mode = "daily", pracSeed = "", speed = 1, paused = false, auto = false, autoT = 0;
+  let sel = null, armed = null, confirmSell = false, hover = null;
+  let acc = 0, last = 0, floats = [], booms = [], banner = null, shownRaw = -1, goalDone = false;
+  let overDismissed = false, runStartBest = 0, shownOv = "", lastInfoH = 0;
+  const STEP = 1 / 60;
+  $("dayno").textContent = dayNumber(dateKey());
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; }
+
+  // ---------- fit the whole game on one screen ----------
+  function fit() {
+    const board = $("board"), stage = $("stage");
+    const others = stage.offsetHeight - board.offsetHeight;
+    const top = stage.getBoundingClientRect().top + (window.pageYOffset || 0);
+    const stageW = stage.clientWidth;
+    let availH = window.innerHeight - top - others - 10;
+    availH = Math.max(230, availH);
+    let w = Math.min(stageW, availH * W / H);
+    w = Math.max(190, Math.floor(w));
+    board.style.width = w + "px";
+  }
+  window.addEventListener("resize", fit);
+  window.addEventListener("orientationchange", fit);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+
+  function newRun() {
+    const seed = mode === "daily" ? "feeless-defence-" + dateKey() : "practice-" + pracSeed;
+    g = newGame(seed); sel = null; armed = null; confirmSell = false; hover = null;
+    floats = []; booms = []; banner = null; acc = 0; autoT = 0; paused = false; overDismissed = false;
+    runStartBest = bestToday();
+    goalDone = mode === "daily" && lsGet("fd-goal-" + dateKey(), "0") === "1";
+    $("modbox").textContent = "";
+    const b = document.createElement("b"); b.textContent = (mode === "daily" ? "Today: " : "Practice: ") + g.mod.name;
+    $("modbox").appendChild(b); $("modbox").appendChild(document.createTextNode(" · " + g.mod.desc));
+    buildTools(); renderInfo(); renderControls(); updateHud(true);
+    fit();
+  }
+  function setMode(m) {
+    mode = m;
+    $("m-daily").setAttribute("aria-pressed", m === "daily" ? "true" : "false");
+    $("m-practice").setAttribute("aria-pressed", m === "practice" ? "true" : "false");
+    if (m === "practice") pracSeed = String(Math.floor(Math.random() * 1e9));
+    newRun();
+  }
+  function newMap() { pracSeed = String(Math.floor(Math.random() * 1e9)); newRun(); }
+  $("m-daily").addEventListener("click", function () { if (mode !== "daily") setMode("daily"); else newRun(); });
+  $("m-practice").addEventListener("click", function () { if (mode !== "practice") setMode("practice"); });
+
+  // ---------- HUD and controls ----------
+  function setText(e, txt) { if (e.textContent !== String(txt)) e.textContent = txt; }
+  function updateHud(force) {
+    setText($("h-lives").querySelector("b"), g.lives);
+    setText($("h-raw").querySelector("b"), g.raw);
+    setText($("h-wave").querySelector("b"), g.wave);
+    if (force || shownRaw !== g.raw) { shownRaw = g.raw; refreshAfford(); }
+  }
+  function setHidden(node, hide) { if (node.hidden !== hide) node.hidden = hide; }
+  function syncOverlays() {
+    const which = (g.over && !overDismissed) ? "over" : (paused && !g.over) ? "pause" : "";
+    setHidden($("ov-pause"), which !== "pause");
+    setHidden($("ov-over"), which !== "over");
+    if (which !== shownOv) {
+      shownOv = which;
+      if (which === "pause") { $("p-newmap").hidden = mode !== "practice"; $("p-text").textContent = "Wave " + g.wave + " · Integrity " + g.lives + " · Raw " + g.raw; try { $("p-resume").focus({ preventScroll: true }); } catch (e) {} }
+      if (which === "over") { try { $("o-again").focus({ preventScroll: true }); } catch (e) {} }
+    }
+  }
+  function renderControls() {
+    const wb = $("wave");
+    if (g.over) { wb.disabled = false; wb.textContent = "Play again"; }
+    else {
+      wb.disabled = g.active;
+      wb.textContent = g.active ? "Wave " + g.wave + " running" : (autoT > 0 && auto && g.wave > 0 ? "Wave " + (g.wave + 1) + " in " + Math.ceil(autoT) + "s" : "Start wave " + (g.wave + 1));
+    }
+    $("speed").textContent = "x" + speed;
+    $("speed").setAttribute("aria-label", "Game speed x" + speed);
+    $("pause").textContent = paused ? "Resume" : "Pause";
+    $("pause").disabled = g.over;
+    $("auto").textContent = auto ? "Auto on" : "Auto";
+    $("auto").setAttribute("aria-pressed", auto ? "true" : "false");
+    syncOverlays();
+  }
+  function callWave() {
+    if (!startWave(g)) return;
+    paused = false;
+    banner = { text: g.wave % 5 === 0 ? "AUDIT WAVE " + g.wave : "WAVE " + g.wave, t: 1.5 };
+    const w = g.wave;
+    if (w > stats.all) { stats.all = w; saveStats(); }
+    if (mode === "daily") {
+      const k = "fd-best-" + dateKey();
+      if (w > (parseInt(lsGet(k, "0"), 10) || 0)) lsSet(k, w);
+      if (w >= 5 && !goalDone) dailyGoal();
+    }
+    if (w >= 5) award("w5"); if (w >= 10) award("w10"); if (w >= 20) award("w20");
+    if (w >= 6 && g.leaks === 0) award("clean");
+    renderStats(); renderControls(); updateHud(true);
+  }
+  function dailyGoal() {
+    goalDone = true; lsSet("fd-goal-" + dateKey(), "1");
+    const t = dateKey();
+    if (stats.last !== t) { stats.streak = stats.last === yesterdayKey() ? stats.streak + 1 : 1; stats.last = t; }
+    if (stats.streak > stats.bstreak) stats.bstreak = stats.streak;
+    saveStats();
+    if (stats.streak >= 3) award("streak3"); if (stats.streak >= 7) award("streak7");
+    toastMsg = toastMsg || { text: "DAILY GOAL DONE", t: 2.4 };
+  }
+  function togglePause() { if (g.over) return; paused = !paused; renderControls(); }
+  $("wave").addEventListener("click", function () { if (g.over) newRun(); else callWave(); });
+  $("speed").addEventListener("click", function () { speed = speed === 1 ? 2 : speed === 2 ? 3 : 1; renderControls(); });
+  $("pause").addEventListener("click", togglePause);
+  $("auto").addEventListener("click", function () { auto = !auto; autoT = 0; renderControls(); });
+  $("p-resume").addEventListener("click", function () { paused = false; renderControls(); });
+  $("p-restart").addEventListener("click", function () { newRun(); });
+  $("p-newmap").addEventListener("click", newMap);
+  document.addEventListener("visibilitychange", function () { if (document.hidden && !g.over && !paused) { paused = true; renderControls(); } });
+
+  // ---------- tower bar, info strip ----------
+  const toolsEl = $("tools");
+  function buildTools() {
+    toolsEl.textContent = "";
+    TKEYS.forEach(function (k) {
+      const T = TOWERS[k];
+      const b = document.createElement("button"); b.type = "button"; b.setAttribute("data-k", k);
+      const nm = el("span", "tn"); const dot = el("i", "dot"); dot.style.background = T.col;
+      nm.appendChild(dot); nm.appendChild(document.createTextNode(T.name));
+      b.appendChild(nm); b.appendChild(el("span", "tc", String(towerCost(g, k))));
+      b.addEventListener("click", function () { toolClick(k); });
+      toolsEl.appendChild(b);
+    });
+    refreshAfford();
+  }
+  function refreshAfford() {
+    toolsEl.querySelectorAll("button").forEach(function (b) {
+      const k = b.getAttribute("data-k"), cost = towerCost(g, k);
+      b.classList.toggle("poor", g.raw < cost);
+      b.setAttribute("aria-pressed", armed === k ? "true" : "false");
+      b.setAttribute("aria-label", TOWERS[k].name + ", " + cost + " raw" + (g.raw < cost ? ", not enough raw yet" : ""));
+    });
+    const tw = selTower(), ub = $("b-up");
+    if (tw && ub && tw.lvl < 3) ub.disabled = g.raw < upgradeCost(g, tw);
+  }
+  function selTower() { return sel ? towerAt(g, sel.c, sel.r) : null; }
+  function floatAt(c, r, txt, col) { floats.push({ x: c * CS + CS / 2, y: r * CS + CS / 2 - 10, txt: txt, col: col, t: 0.9 }); }
+  function tryBuild(k, c, r) {
+    if (g.over || !canPlace(g, c, r)) return false;
+    const cost = towerCost(g, k);
+    if (g.raw < cost) { floatAt(c, r, "Need " + cost, C["--bad"]); return false; }
+    const tw = place(g, k, c, r);
+    if (!tw) return false;
+    floatAt(c, r, TOWERS[k].name, TOWERS[k].col);
+    sel = { c: c, r: r }; confirmSell = false;
+    updateHud(true); renderInfo(); return true;
+  }
+  function toolClick(k) {
+    if (g.over) return;
+    confirmSell = false;
+    const tw = selTower();
+    if (sel && !tw && canPlace(g, sel.c, sel.r)) { armed = k; tryBuild(k, sel.c, sel.r); }
+    else armed = armed === k ? null : k;
+    refreshAfford(); renderInfo();
+  }
+  function upgradeSel() {
+    const tw = selTower(); if (!tw || confirmSell) return;
+    if (upgrade(g, tw)) {
+      floatAt(tw.c, tw.r, "LV " + (tw.lvl + 1), C["--gold"]);
+      if (tw.lvl >= 3) award("max");
+      updateHud(true); renderInfo();
+    } else if (tw.lvl < 3) floatAt(tw.c, tw.r, "Need " + upgradeCost(g, tw), C["--bad"]);
+  }
+  function sellAsk() { if (selTower()) { confirmSell = true; renderInfo(); } }
+  function sellDo() {
+    const tw = selTower(); if (!tw) return;
+    const v = sell(g, tw); floatAt(tw.c, tw.r, "+" + v, C["--gold"]);
+    sel = null; confirmSell = false; updateHud(true); renderInfo();
+  }
+  function sellCancel() { confirmSell = false; renderInfo(); }
+  function infoBtn(label, cls, fn, id) {
+    const b = el("button", cls || "", label); b.type = "button"; if (id) b.id = id; b.addEventListener("click", fn); return b;
+  }
+  function renderInfo() {
+    const p = $("info"); p.textContent = "";
+    p.classList.toggle("warn", confirmSell && !!selTower());
+    const tw = selTower();
+    if (tw) {
+      const T = TOWERS[tw.k], s = tstat(tw);
+      if (confirmSell) {
+        const t = el("div", "t"); t.appendChild(el("b", "", "Sell this " + T.name + " for +" + sellValue(tw) + " raw?"));
+        p.appendChild(t);
+        const a = el("div", "acts");
+        a.appendChild(infoBtn("Yes, sell", "danger", sellDo, "b-sell-yes"));
+        a.appendChild(infoBtn("Keep it", "", sellCancel, "b-sell-no"));
+        p.appendChild(a);
+      } else {
+        let line = Math.round(s.dmg * 10) / 10 + " dmg · " + Math.round(s.rate * 100) / 100 + "/s · range " + Math.round(s.range);
+        if (s.splash) line += " · splash " + Math.round(s.splash);
+        if (s.st) line += " · slows to " + Math.round(s.sf * 100) + "%";
+        const row = el("div", "tr");
+        row.appendChild(el("span", "tt", T.name + " · Lv " + (tw.lvl + 1) + "/4"));
+        const a = el("div", "acts2");
+        if (tw.lvl < 3) { const ub = infoBtn("Upgrade · " + upgradeCost(g, tw), "primary", upgradeSel, "b-up"); ub.disabled = g.raw < upgradeCost(g, tw); a.appendChild(ub); }
+        else { const ub = infoBtn("Max level", "", function () {}, "b-up"); ub.disabled = true; a.appendChild(ub); }
+        a.appendChild(infoBtn("Sell · +" + sellValue(tw), "", sellAsk, "b-sell"));
+        row.appendChild(a);
+        p.appendChild(row);
+        p.appendChild(el("div", "s mono", line));
+      }
+    } else if (sel && canPlace(g, sel.c, sel.r)) {
+      p.appendChild(el("div", "t", armed ? "Press Enter to build a " + TOWERS[armed].name + " here (" + towerCost(g, armed) + " raw)." : "Build here: pick a tower in the bar above."));
+      p.appendChild(el("div", "s", "Tap a tower on the map to upgrade or sell it."));
+    } else if (armed) {
+      const T = TOWERS[armed];
+      const t = el("div", "t"); t.appendChild(el("b", "", T.name + ": ")); t.appendChild(document.createTextNode(T.desc));
+      p.appendChild(t);
+      p.appendChild(el("div", "s", "Tap empty tiles to build for " + towerCost(g, armed) + " raw each. Tap " + T.name + " again to stop."));
+    } else {
+      p.appendChild(el("div", "t", "Pick a tower in the bar above, then tap empty tiles to build."));
+      p.appendChild(el("div", "s", "Tap a tower on the map to upgrade or sell it."));
+    }
+    if (p.offsetHeight !== lastInfoH) { lastInfoH = p.offsetHeight; fit(); }
+  }
+
+  // ---------- input ----------
+  function cellFromEvent(e) {
+    const r = cv.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width * W, y = (e.clientY - r.top) / r.height * H;
+    return { c: Math.max(0, Math.min(COLS - 1, Math.floor(x / CS))), r: Math.max(0, Math.min(ROWS - 1, Math.floor(y / CS))) };
+  }
+  cv.addEventListener("pointerdown", function (e) {
+    if (g.over || paused) return;
+    const p = cellFromEvent(e), tw = towerAt(g, p.c, p.r), same = sel && sel.c === p.c && sel.r === p.r;
+    confirmSell = false;
+    if (tw) sel = same ? null : p;
+    else if (g.path.set.has(p.c + "," + p.r)) { sel = null; floatAt(p.c, p.r, "Path", C["--muted"]); }
+    else if (armed) tryBuild(armed, p.c, p.r);
+    else sel = same ? null : p;
+    refreshAfford(); renderInfo();
+  });
+  cv.addEventListener("pointermove", function (e) { if (e.pointerType === "mouse") hover = cellFromEvent(e); });
+  cv.addEventListener("pointerleave", function () { hover = null; });
+  cv.addEventListener("keydown", function (e) {
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (g.over || paused) { if (k === "p") togglePause(); return; }
+    if (k === "ArrowLeft" || k === "ArrowRight" || k === "ArrowUp" || k === "ArrowDown") {
+      e.preventDefault(); confirmSell = false;
+      if (!sel) sel = { c: 0, r: 0 };
+      else sel = { c: Math.max(0, Math.min(COLS - 1, sel.c + (k === "ArrowRight" ? 1 : k === "ArrowLeft" ? -1 : 0))), r: Math.max(0, Math.min(ROWS - 1, sel.r + (k === "ArrowDown" ? 1 : k === "ArrowUp" ? -1 : 0))) };
+      renderInfo();
+    } else if (k >= "1" && k <= "4") { toolClick(TKEYS[+k - 1]); }
+    else if (k === "Enter") { e.preventDefault(); if (sel && armed && canPlace(g, sel.c, sel.r)) tryBuild(armed, sel.c, sel.r); else if (confirmSell) sellDo(); }
+    else if (k === "u") upgradeSel();
+    else if (k === "s") sellAsk();
+    else if (k === "y") { if (confirmSell) sellDo(); }
+    else if (k === "n") callWave();
+    else if (k === "p") togglePause();
+    else if (k === "Escape") { if (confirmSell) confirmSell = false; else if (sel) sel = null; else armed = null; refreshAfford(); renderInfo(); }
+  });
+  cv.addEventListener("focus", function () { if (!sel) { sel = { c: 0, r: 0 }; renderInfo(); } });
+
+  // ---------- main loop ----------
+  function handleEvents() {
+    g.events.forEach(function (ev) {
+      if (ev.k === "kill") floats.push({ x: ev.x, y: ev.y - 8, txt: "+" + ev.v, col: C["--gold"], t: 0.7 });
+      else if (ev.k === "boom") booms.push({ x: ev.x, y: ev.y, r: ev.r, t: 0.25 });
+      else if (ev.k === "leak") { floats.push({ x: ev.x, y: Math.min(H - 20, ev.y), txt: "-" + ev.v, col: C["--bad"], t: 0.9 }); }
+      else if (ev.k === "clear") {
+        banner = { text: "WAVE " + ev.w + " CLEARED", t: 1.4 }; autoT = 3;
+        if (g.whales > 0) award("boss");
+        renderControls();
+      }
+    });
+    g.events.length = 0;
+  }
+  function onOver() {
+    stats.runs++; saveStats(); renderStats();
+    const w = g.wave, best = mode === "daily" ? bestToday() : stats.all;
+    $("o-wave").textContent = "Wave " + w;
+    $("o-new").hidden = !(mode === "daily" && w > runStartBest && w >= 2);
+    $("o-text").textContent = "You stopped " + g.kills + " enemies. " +
+      (mode === "daily" ? "Today's best is wave " + best + ". " + (goalDone ? "Daily goal done. Streak: " + currentStreak() + "." : "Reach wave 5 to keep your streak.") : "Practice runs don't affect your streak.");
+    $("o-status").textContent = "";
+    $("o-newmap").hidden = mode !== "practice";
+    overDismissed = false; renderControls(); renderInfo();
+  }
+  function frame(now) {
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    if (!paused && !g.over && !document.hidden) {
+      acc += dt * speed; let n = 0;
+      while (acc >= STEP && n < 14) {
+        step(g, STEP); acc -= STEP; n++;
+        if (!g.active && g.wave > 0 && !g.over && auto) {
+          autoT -= STEP;
+          if (autoT <= 0) { callWave(); }
+        }
+        if (g.over) break;
+      }
+      if (n >= 14) acc = 0;
+      handleEvents();
+      if (g.over) onOver();
+      if (!g.active && auto && g.wave > 0 && !g.over) { const c = Math.ceil(autoT); if (c !== frame.lc) { frame.lc = c; renderControls(); } }
+      updateHud(false);
+    }
+    for (let i = floats.length - 1; i >= 0; i--) { floats[i].t -= dt; floats[i].y -= 28 * dt; if (floats[i].t <= 0) floats.splice(i, 1); }
+    for (let i = booms.length - 1; i >= 0; i--) { booms[i].t -= dt; if (booms[i].t <= 0) booms.splice(i, 1); }
+    if (banner) { banner.t -= dt; if (banner.t <= 0) banner = null; }
+    if (toastMsg) { toastMsg.t -= dt; if (toastMsg.t <= 0) toastMsg = null; }
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- drawing ----------
+  function poly(x, y, r, n, rot) {
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) { const a = rot + i * Math.PI * 2 / n; const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); }
+    ctx.closePath();
+  }
+  function drawEnemy(e) {
+    ctx.save();
+    if (e.type === "dust") { ctx.fillStyle = "#f472b6"; poly(e.x, e.y, 7, 4, Math.PI / 4); ctx.fill(); }
+    else if (e.type === "spam") { ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.arc(e.x, e.y, 10, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = "#fff"; ctx.font = "800 9px 'JetBrains Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("$", e.x, e.y + 1); }
+    else if (e.type === "bot") { ctx.fillStyle = "#991b1b"; poly(e.x, e.y, 14, 6, 0); ctx.fill(); ctx.strokeStyle = "#fca5a5"; ctx.lineWidth = 2; ctx.stroke(); ctx.fillStyle = "#fff"; ctx.fillRect(e.x - 5, e.y - 3, 3, 3); ctx.fillRect(e.x + 2, e.y - 3, 3, 3); }
+    else { ctx.fillStyle = "#111827"; ctx.beginPath(); ctx.arc(e.x, e.y, 19, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = C["--gold"]; ctx.lineWidth = 3; ctx.stroke(); ctx.fillStyle = C["--gold"]; ctx.font = "800 9px 'JetBrains Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("AUDIT", e.x, e.y + 1); }
+    if (e.slow > 0) { ctx.strokeStyle = "#2dd4bf"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(e.x, e.y, (e.type === "whale" ? 23 : e.type === "bot" ? 17 : 12), 0, Math.PI * 2); ctx.stroke(); }
+    if (e.hp < e.max) {
+      const w = e.type === "whale" ? 36 : 22, yy = e.y - (e.type === "whale" ? 27 : e.type === "bot" ? 21 : 16);
+      ctx.fillStyle = "rgba(0,0,0,0.5)"; ctx.fillRect(e.x - w / 2, yy, w, 3);
+      ctx.fillStyle = C["--good"]; ctx.fillRect(e.x - w / 2, yy, w * Math.max(0, e.hp / e.max), 3);
+    }
+    ctx.restore();
+  }
+  function drawTower(tw) {
+    const T = TOWERS[tw.k];
+    ctx.save(); ctx.translate(tw.x, tw.y);
+    ctx.fillStyle = "rgba(0,0,0,0.35)"; ctx.beginPath(); ctx.arc(1, 2, 17, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = T.col; ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.75)"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.rotate(tw.aim); ctx.fillStyle = "rgba(0,0,0,0.55)"; ctx.fillRect(4, -2.5, 15, 5); ctx.rotate(-tw.aim);
+    ctx.fillStyle = "#04101f"; ctx.font = "800 12px 'JetBrains Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(tw.k === "node" ? "N" : tw.k === "rep" ? "R" : tw.k === "prune" ? "P" : "T", 0, 1);
+    for (let i = 0; i <= tw.lvl; i++) { ctx.fillStyle = C["--gold"]; ctx.fillRect(-9 + i * 6, 12, 4, 3); }
+    ctx.restore();
+  }
+  function draw() {
+    ctx.save();
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = C["--field"]; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = C["--line"]; ctx.lineWidth = 1; ctx.globalAlpha = 0.45;
+    for (let x = 1; x < COLS; x++) { ctx.beginPath(); ctx.moveTo(x * CS + 0.5, 0); ctx.lineTo(x * CS + 0.5, H); ctx.stroke(); }
+    for (let y = 1; y < ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * CS + 0.5); ctx.lineTo(W, y * CS + 0.5); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = C["--path"];
+    g.path.set.forEach(function (k) { const p = k.split(","); ctx.fillRect(+p[0] * CS, +p[1] * CS, CS, CS); });
+    ctx.fillStyle = C["--muted"]; ctx.font = "600 9px 'JetBrains Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("SPAM IN", g.path.entry * CS + CS / 2, 8);
+    ctx.fillStyle = C["--gold"]; ctx.fillRect(g.path.exit * CS + 2, H - 7, CS - 4, 5);
+    ctx.font = "800 9px 'JetBrains Mono',monospace"; ctx.fillText("LEDGER", g.path.exit * CS + CS / 2, H - 15);
+    // build hints: dots on every free tile while a tower type is armed
+    if (armed && !g.over) {
+      ctx.fillStyle = TOWERS[armed].col; ctx.globalAlpha = 0.3;
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        if (canPlace(g, c, r)) { ctx.beginPath(); ctx.arc(c * CS + CS / 2, r * CS + CS / 2, 3, 0, Math.PI * 2); ctx.fill(); }
+      }
+      ctx.globalAlpha = 1;
+      if (hover && canPlace(g, hover.c, hover.r)) {
+        const T = TOWERS[armed], hx = hover.c * CS + CS / 2, hy = hover.r * CS + CS / 2;
+        ctx.globalAlpha = 0.14; ctx.fillStyle = T.col; ctx.beginPath(); ctx.arc(hx, hy, T.range, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.6; ctx.strokeStyle = T.col; ctx.lineWidth = 2; ctx.stroke(); ctx.globalAlpha = 1;
+      }
+    }
+    if (sel) {
+      const tw = selTower();
+      if (tw) {
+        const s = tstat(tw); ctx.strokeStyle = C["--accent"]; ctx.fillStyle = C["--accent"]; ctx.lineWidth = 2;
+        ctx.globalAlpha = 0.14; ctx.beginPath(); ctx.arc(tw.x, tw.y, s.range, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 0.8; ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      ctx.strokeStyle = C["--accent"]; ctx.lineWidth = 2.5; ctx.strokeRect(sel.c * CS + 2, sel.r * CS + 2, CS - 4, CS - 4);
+    }
+    g.towers.forEach(drawTower);
+    g.enemies.forEach(drawEnemy);
+    g.bullets.forEach(function (b) { ctx.fillStyle = b.col; ctx.beginPath(); ctx.arc(b.x, b.y, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke(); });
+    booms.forEach(function (b) { ctx.globalAlpha = Math.max(0, b.t / 0.25) * 0.5; ctx.fillStyle = "#fb923c"; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; });
+    ctx.font = "800 13px 'JetBrains Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    floats.forEach(function (f) { ctx.globalAlpha = Math.max(0, Math.min(1, f.t / 0.4)); ctx.fillStyle = f.col; ctx.fillText(f.txt, f.x, f.y); });
+    ctx.globalAlpha = 1;
+    if (banner) {
+      ctx.globalAlpha = Math.min(1, banner.t / 0.4); ctx.fillStyle = C["--accent"]; ctx.font = "800 26px Sora,sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(banner.text, W / 2, 110); ctx.globalAlpha = 1;
+    }
+    if (toastMsg) {
+      ctx.globalAlpha = Math.min(1, toastMsg.t / 0.4); ctx.fillStyle = C["--gold"]; ctx.font = "800 14px 'JetBrains Mono',monospace";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(toastMsg.text, W / 2, 142); ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  // ---------- game over: share, tip ----------
+  function copyText(text, ok, fail) { try { navigator.clipboard.writeText(text).then(ok, fail); } catch (e) { fail(); } }
+  function shareUrl() { return location.href.split("#")[0].split("?")[0]; }
+  $("o-again").addEventListener("click", function () { newRun(); });
+  $("o-newmap").addEventListener("click", newMap);
+  $("o-share").addEventListener("click", function () {
+    const head = mode === "daily" ? "Feeless Defence #" + dayNumber(dateKey()) + " (" + g.mod.name + ")" : "Feeless Defence practice";
+    const msg = head + ": held the ledger to wave " + g.wave + " (" + g.kills + " stopped). Can you beat it? " + shareUrl();
+    const fallback = function () { copyText(msg, function () { $("o-status").textContent = "Copied. Paste it into a message to challenge a friend."; }, function () { $("o-status").textContent = msg; }); };
+    if (navigator.share) { navigator.share({ text: msg }).catch(fallback); return; }
+    fallback();
+  });
+  $("o-tip").addEventListener("click", function () {
+    pickAmount(document.querySelector('.amounts button[data-amt="0.01"]'));
+    overDismissed = true; renderControls();
+    try { $("tip").scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {}
+  });
+
+  // ---------- tip card ----------
+  let tipAmt = "0.01", qr = null, checking = false;
+  function toRaw(xno) {
+    const parts = xno.split("."), frac = ((parts[1] || "") + "000000000000000000000000000000").slice(0, 30);
+    return (BigInt(parts[0]) * 10n ** 30n + BigInt(frac)).toString();
+  }
+  function uriFor(a) { return "nano:" + NANO_ADDRESS + (a ? "?amount=" + toRaw(a) : ""); }
+  function setPending() { if (tipAmt) lsSet("fd-tip", JSON.stringify({ amt: tipAmt, ts: Date.now() })); }
+  function renderTip() {
+    $("addr").textContent = NANO_ADDRESS;
+    const uri = uriFor(tipAmt);
+    $("openw").href = uri;
+    $("check").hidden = !tipAmt;
+    $("thint").textContent = tipAmt
+      ? "On a phone, tap Open in wallet. On a computer, scan the code with your Nano wallet. Then press the check button."
+      : "Any amount is welcome. Tips sent this way can't be checked automatically, so they don't unlock themes.";
+    try {
+      if (typeof QRCode === "undefined") throw new Error("no qr");
+      if (!qr) qr = new QRCode($("qr"), { text: uri, width: 168, height: 168, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
+      else { qr.clear(); qr.makeCode(uri); }
+    } catch (e) { $("qr").style.display = "none"; }
+  }
+  function pickAmount(btn) {
+    if (!btn) return;
+    document.querySelectorAll(".amounts button").forEach(function (o) { o.setAttribute("aria-pressed", "false"); });
+    btn.setAttribute("aria-pressed", "true");
+    tipAmt = btn.getAttribute("data-amt"); setPending(); renderTip(); $("tstatus").textContent = "";
+  }
+  document.querySelectorAll(".amounts button").forEach(function (b) { b.addEventListener("click", function () { pickAmount(b); }); });
+  $("openw").addEventListener("click", function () { setPending(); $("tstatus").textContent = "After you send, come back here and press the check button."; });
+  $("copy").addEventListener("click", function () {
+    setPending();
+    copyText(NANO_ADDRESS, function () { $("tstatus").textContent = "Address copied."; }, function () {
+      const r = document.createRange(); r.selectNodeContents($("addr")); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      $("tstatus").textContent = "Address selected. Press copy on your device.";
+    });
+  });
+  function rpc(body) {
+    let i = 0;
+    return new Promise(function (resolve, reject) {
+      (function next() {
+        if (i >= RPCS.length) { reject(new Error("unreachable")); return; }
+        const url = RPCS[i++], ctl = new AbortController(), t = setTimeout(function () { ctl.abort(); }, 6000);
+        fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: ctl.signal })
+          .then(function (r) { return r.json(); })
+          .then(function (j) { clearTimeout(t); resolve(j); })
+          .catch(function () { clearTimeout(t); next(); });
+      })();
+    });
+  }
+  async function findTip(min, since) {
+    const claimed = jget("fd-claimed", []);
+    const need = BigInt(toRaw(min));
+    let reachable = false;
+    try {
+      const h = await rpc({ action: "account_history", account: NANO_ADDRESS, count: "60" });
+      reachable = true;
+      if (h && Array.isArray(h.history)) {
+        for (const b of h.history) {
+          if (b.type !== "receive" || claimed.indexOf(b.hash) >= 0) continue;
+          const ts = +b.local_timestamp;
+          if (ts > 0 && ts * 1000 < since - 120000) continue;
+          if (BigInt(b.amount) >= need) return { ok: true, hash: b.hash };
+        }
+      }
+    } catch (e) {}
+    for (const cmd of ["receivable", "pending"]) {
+      try {
+        const p = await rpc({ action: cmd, account: NANO_ADDRESS, count: "60", threshold: need.toString(), source: "true" });
+        reachable = true;
+        if (p && p.error) continue;
+        const bl = p && p.blocks;
+        if (bl && typeof bl === "object") {
+          for (const hsh in bl) {
+            if (claimed.indexOf(hsh) >= 0) continue;
+            const v = bl[hsh], amt = typeof v === "object" ? v.amount : v;
+            if (BigInt(amt) >= need) return { ok: true, hash: hsh };
+          }
+        }
+        break;
+      } catch (e) {}
+    }
+    return { ok: false, reachable: reachable };
+  }
+  function unlockSupporter(hash) {
+    const claimed = jget("fd-claimed", []); claimed.push(hash); lsSet("fd-claimed", JSON.stringify(claimed.slice(-50)));
+    supporter = true; lsSet("fd-sup", "1"); award("supporter"); renderThemes();
+    lsSet("fd-tip", "");
+    $("tstatus").textContent = "Thank you! Your tip arrived and the supporter themes are unlocked.";
+  }
+  async function runCheck(tries, silent) {
+    if (checking) return;
+    const pend = jget("fd-tip", null);
+    if (!pend || !pend.amt) { if (!silent) $("tstatus").textContent = "Pick an amount first."; return; }
+    checking = true; $("check").disabled = true;
+    if (!silent) $("tstatus").textContent = "Checking the Nano network…";
+    let res = { ok: false, reachable: false };
+    for (let i = 0; i < tries; i++) {
+      res = await findTip(pend.amt, pend.ts);
+      if (res.ok) break;
+      if (i < tries - 1) await new Promise(function (r) { setTimeout(r, 4000); });
+    }
+    checking = false; $("check").disabled = false;
+    if (res.ok) unlockSupporter(res.hash);
+    else if (!silent) $("tstatus").textContent = res.reachable
+      ? "Not seen yet. Transfers take a few seconds, so press the check button again in a moment."
+      : "Couldn't reach the Nano network from here. Try again shortly.";
+  }
+  $("check").addEventListener("click", function () { runCheck(8, false); });
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && !supporter && jget("fd-tip", null)) runCheck(4, true);
+  });
+  if (jget("fd-tip", null) && !jget("fd-tip", null).amt) lsSet("fd-tip", "");
+  renderTip();
+
+  // ---------- go ----------
+  newRun();
+  last = performance.now();
+  requestAnimationFrame(frame);
+  requestAnimationFrame(fit);
+})();
+</script>
+</body></html>
