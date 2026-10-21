@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Feeless Defence</title>
-<meta name="description" content="A daily tower defence game. Protect the Nano ledger from spam. New map every day, free, no fees.">
+<meta name="description" content="A daily tower defence game. Keep fees off the Nano ledger. New map every day, free, no fees.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;800&family=JetBrains+Mono:wght@400;600&display=swap">
@@ -214,7 +214,7 @@ footer { color:var(--muted); font-size:0.8rem; }
         <h3>Towers</h3>
         <p><b>Node</b>: fast and cheap. <b>Rep</b>: long range, hits hard, slow. <b>Pruner</b>: splash damage, great against swarms. <b>Throttle</b>: slows enemies so everything else hits more often.</p>
         <h3>Enemies</h3>
-        <p><b>Dust</b> comes in swarms. <b>Spam</b> is the all-rounder. <b>Bots</b> are slow and tough and cost 2 Integrity. Every 5th wave an <b>Audit</b> boss arrives and costs 8 Integrity if it gets through.</p>
+        <p>Nano is feeless, so fees are the enemy. <b>Fees</b> come in swarms. <b>Gas</b> is the all-rounder. <b>Bots</b> are slow and tough and cost 2 Integrity. Every 5th wave an <b>Audit</b> boss arrives and costs 6 Integrity if it gets through.</p>
         <h3>Raw</h3>
         <p>Raw is the in-game money you earn from kills and from clearing waves. It has nothing to do with real XNO. Money is tight, so choose between a new tower and an upgrade.</p>
         <h3>Daily</h3>
@@ -312,17 +312,17 @@ const TOWERS = {
 };
 const TKEYS = ["node", "rep", "prune", "throttle"];
 const ENEMIES = {
-  dust:  { name: "Dust",  hp: 7,   spd: 74, reward: 1,  leak: 1,  gap: 0.38 },
-  spam:  { name: "Spam",  hp: 22,  spd: 54, reward: 3,  leak: 1,  gap: 0.7 },
+  dust:  { name: "Fee",  hp: 7,   spd: 74, reward: 1,  leak: 1,  gap: 0.38 },
+  spam:  { name: "Gas",   hp: 22,  spd: 54, reward: 3,  leak: 1,  gap: 0.7 },
   bot:   { name: "Bot",   hp: 80,  spd: 36, reward: 8,  leak: 2,  gap: 1.2 },
-  whale: { name: "Audit", hp: 550, spd: 28, reward: 60, leak: 8,  gap: 2.5 }
+  whale: { name: "Audit", hp: 400, spd: 28, reward: 60, leak: 6,  gap: 2.5 }
 };
 const MODS = [
   { id: "plain", name: "Clean books",    desc: "No twist today." },
   { id: "rush",  name: "Rush hour",      desc: "Enemies move 20% faster.", spdMul: 1.2 },
   { id: "armor", name: "Armoured bots",  desc: "Bots have 50% more HP.", botHp: 1.5 },
-  { id: "swarm", name: "Swarm",          desc: "Twice as much dust.", dustMul: 2 },
-  { id: "bull",  name: "Bull market",    desc: "+50% start raw, enemies +15% HP.", startRaw: 188, hpMul: 1.15 },
+  { id: "swarm", name: "Swarm",          desc: "Twice as many fees.", dustMul: 2 },
+  { id: "bull",  name: "Bull market",    desc: "+50% start raw, enemies +15% HP.", startRaw: 210, hpMul: 1.15 },
   { id: "bear",  name: "Bear market",    desc: "Towers 20% cheaper, kills pay 30% less.", costMul: 0.8, rewardMul: 0.7 }
 ];
 function makePath(rng) {
@@ -361,7 +361,7 @@ function newGame(seedStr) {
   const path = makePath(rng);
   const mod = MODS[Math.floor(rng() * MODS.length)];
   return {
-    seed: seedStr, path: path, mod: mod, raw: mod.startRaw || 125, lives: 20, wave: 0,
+    seed: seedStr, path: path, mod: mod, raw: mod.startRaw || 140, lives: 20, wave: 0,
     towers: [], enemies: [], bullets: [], queue: [], waveT: 0, active: false, over: false,
     kills: 0, whales: 0, leaks: 0, nextId: 1, time: 0, events: [], cleared: 0
   };
@@ -402,7 +402,7 @@ function sell(g, tw) {
 function buildWave(g, w) {
   const rng = mulberry32(xmur3(g.seed + "|w" + w)());
   const m = g.mod, mix = [];
-  const ramp = Math.min(1, 0.5 + 0.2 * w);
+  const ramp = Math.min(1, 0.4 + 0.17 * w);
   const dust = Math.round((6 + w * 1.7) * ramp * (m.dustMul || 1));
   const spam = w >= 2 ? Math.round((2 + w * 1.2) * ramp) : 0;
   const bot = w >= 4 ? Math.floor((w - 1) / 3) : 0;
@@ -424,7 +424,8 @@ function spawn(g, type) {
   const E = ENEMIES[type], w = g.wave, m = g.mod;
   let hp = E.hp * Math.pow(1.12, w - 1) * (m.hpMul || 1);
   if (type === "bot") hp *= (m.botHp || 1);
-  const spd = E.spd * (m.spdMul || 1) * (1 + Math.min(0.3, (w - 1) * 0.01));
+  if (type === "whale") hp *= 1 + 0.08 * Math.max(0, w - 5);
+  const spd = E.spd * (m.spdMul || 1) * (1 + Math.min(0.3, (w - 1) * 0.01)) * Math.min(1, 0.8 + 0.07 * w);
   const p = posAt(g.path, 0);
   g.enemies.push({ id: g.nextId++, type: type, hp: hp, max: hp, d: 0, spd: spd, slow: 0, sf: 1, x: p.x, y: p.y,
     reward: Math.max(1, E.reward * (1 + 0.04 * (w - 1)) * (m.rewardMul || 1)), leak: E.leak, dead: false });
@@ -489,7 +490,7 @@ function step(g, dt) {
   g.bullets = g.bullets.filter(function (b) { return !b.done; });
   g.enemies = g.enemies.filter(function (e) { return !e.dead; });
   if (g.active && !g.over && g.queue.length === 0 && g.enemies.length === 0) {
-    g.active = false; g.cleared = g.wave; g.raw += 14 + 2 * g.wave;
+    g.active = false; g.cleared = g.wave; g.raw += 18 + 2 * g.wave;
     g.events.push({ k: "clear", w: g.wave });
   }
 }
@@ -505,7 +506,7 @@ function dayNumber(key) { return Math.max(1, Math.floor((Date.parse(key + "T00:0
     { id: "w20", name: "Unbreakable", d: "Reach wave 20" },
     { id: "boss", name: "Auditor", d: "Stop an Audit boss" },
     { id: "max", name: "Fully synced", d: "Upgrade a tower to level 4" },
-    { id: "clean", name: "Clean sheet", d: "Reach wave 6 without a leak" },
+    { id: "clean", name: "Feeless", d: "Reach wave 6 without letting anything through" },
     { id: "streak3", name: "Regular", d: "A 3-day streak" },
     { id: "streak7", name: "Resident", d: "A 7-day streak" },
     { id: "supporter", name: "Supporter", d: "Send a tip" }
@@ -932,7 +933,7 @@ function dayNumber(key) { return Math.max(1, Math.floor((Date.parse(key + "T00:0
     ctx.fillStyle = C["--path"];
     g.path.set.forEach(function (k) { const p = k.split(","); ctx.fillRect(+p[0] * CS, +p[1] * CS, CS, CS); });
     ctx.fillStyle = C["--muted"]; ctx.font = "600 9px 'JetBrains Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText("SPAM IN", g.path.entry * CS + CS / 2, 8);
+    ctx.fillText("FEES IN", g.path.entry * CS + CS / 2, 8);
     ctx.fillStyle = C["--gold"]; ctx.fillRect(g.path.exit * CS + 2, H - 7, CS - 4, 5);
     ctx.font = "800 9px 'JetBrains Mono',monospace"; ctx.fillText("LEDGER", g.path.exit * CS + CS / 2, H - 15);
     // build hints: dots on every free tile while a tower type is armed
