@@ -75,6 +75,7 @@ button:focus-visible, .btn:focus-visible, canvas:focus-visible, summary:focus-vi
 .hud b { font-family:"JetBrains Mono",monospace; font-size:1.05rem; font-weight:600; font-variant-numeric:tabular-nums; }
 #h-lives b { color:var(--bad); }
 #h-raw b { color:var(--gold); }
+#h-raw.bear b { color:var(--bad); }
 .board { position:relative; margin-inline:auto; width:100%; aspect-ratio:352/396; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:var(--field); }
 canvas { display:block; width:100%; height:100%; touch-action:manipulation; }
 .tools { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; }
@@ -186,7 +187,7 @@ footer { color:var(--muted); font-size:0.8rem; }
               <button type="button" id="o-share">Share</button>
               <button type="button" id="o-tip">Tip 0.01 XNO</button>
             </div>
-            <button type="button" id="o-newmap" hidden>New random map</button>
+            <button type="button" id="o-retry" hidden>Retry this map</button>
           </div>
           <div class="status" id="o-status" role="status"></div>
         </div>
@@ -216,9 +217,9 @@ footer { color:var(--muted); font-size:0.8rem; }
         <h3>Enemies</h3>
         <p>Nano is feeless, so fees are the enemy. <b>Fees</b> come in swarms. <b>Gas</b> is the all-rounder. <b>Bots</b> are slow and tough and cost 2 Integrity. Every 5th wave an <b>Audit</b> boss arrives and costs 6 Integrity if it gets through.</p>
         <h3>Raw</h3>
-        <p>Raw is the in-game money you earn from kills and from clearing waves. It has nothing to do with real XNO. Money is tight, so choose between a new tower and an upgrade.</p>
+        <p>Raw is the in-game money you earn from kills and from clearing waves. It has nothing to do with real XNO. Money is tight, so choose between a new tower and an upgrade. Very rarely, after wave 8, a Bear Market hits: for 5 seconds kills pay half. On the daily map it strikes at the same moment for everyone.</p>
         <h3>Daily</h3>
-        <p>The map and the twist change at 00:00 UTC and are the same for everyone. Reach wave 5 to keep your daily streak. You can retry as often as you like and your best wave for the day is kept.</p>
+        <p>The map and the twist change at 00:00 UTC and are the same for everyone. Reach wave 5 to keep your daily streak. You can retry as often as you like and your best wave for the day is kept. Practice gives you a random map and a random twist each time. Tap New map for another one.</p>
         <h3>Pause</h3>
         <p>Pause opens a menu where you can resume or restart the map. The game also pauses when you switch away from the page.</p>
         <h3>Keyboard</h3>
@@ -363,7 +364,8 @@ function newGame(seedStr) {
   return {
     seed: seedStr, path: path, mod: mod, raw: mod.startRaw || 140, lives: 20, wave: 0,
     towers: [], enemies: [], bullets: [], queue: [], waveT: 0, active: false, over: false,
-    kills: 0, whales: 0, leaks: 0, nextId: 1, time: 0, events: [], cleared: 0
+    kills: 0, whales: 0, leaks: 0, nextId: 1, time: 0, events: [], cleared: 0,
+    bearAt: null, bearT: 0, carry: 0
   };
 }
 function towerCost(g, k) { return Math.round(TOWERS[k].cost * (g.mod.costMul || 1)); }
@@ -403,10 +405,11 @@ function buildWave(g, w) {
   const rng = mulberry32(xmur3(g.seed + "|w" + w)());
   const m = g.mod, mix = [];
   const ramp = Math.min(1, 0.4 + 0.17 * w);
-  const dust = Math.round((6 + w * 1.7) * ramp * (m.dustMul || 1));
-  const spam = w >= 2 ? Math.round((2 + w * 1.2) * ramp) : 0;
-  const bot = w >= 4 ? Math.floor((w - 1) / 3) : 0;
-  const whale = w % 5 === 0 ? Math.ceil(w / 10) : 0;
+  const late = 1 + 0.05 * Math.max(0, w - 20);
+  const dust = Math.round((6 + w * 1.7) * ramp * late * (m.dustMul || 1));
+  const spam = w >= 2 ? Math.round((2 + w * 1.2) * ramp * late) : 0;
+  const bot = w >= 4 ? Math.floor(((w - 1) / 3) * late) : 0;
+  const whale = w % 5 === 0 ? 1 + Math.floor(Math.max(0, w - 15) / 15) : 0;
   for (let i = 0; i < dust; i++) mix.push("dust");
   for (let i = 0; i < spam; i++) mix.push("spam");
   for (let i = 0; i < bot; i++) mix.push("bot");
@@ -418,13 +421,22 @@ function buildWave(g, w) {
 }
 function startWave(g) {
   if (g.active || g.over) return false;
-  g.wave++; g.queue = buildWave(g, g.wave); g.waveT = 0; g.active = true; return true;
+  g.wave++; g.queue = buildWave(g, g.wave); g.waveT = 0; g.active = true;
+  // Rare Bear Market: after wave 8 a wave has a 3% chance of a 5 second spell where kills pay half.
+  // Seeded, so it hits at the same moment for everyone on the same daily map.
+  g.bearAt = null;
+  if (g.wave > 8) {
+    const br = mulberry32(xmur3(g.seed + "|bear" + g.wave)());
+    if (br() < 0.03) g.bearAt = 2 + br() * 8;
+  }
+  return true;
 }
 function spawn(g, type) {
   const E = ENEMIES[type], w = g.wave, m = g.mod;
   let hp = E.hp * Math.pow(1.12, w - 1) * (m.hpMul || 1);
+  hp *= 1 + (type === "whale" ? 0.07 : 0.035) * Math.max(0, w - 5);
+  hp *= Math.pow(type === "whale" ? 1.06 : 1.08, Math.max(0, w - 20));
   if (type === "bot") hp *= (m.botHp || 1);
-  if (type === "whale") hp *= 1 + 0.08 * Math.max(0, w - 5);
   const spd = E.spd * (m.spdMul || 1) * (1 + Math.min(0.3, (w - 1) * 0.01)) * Math.min(1, 0.8 + 0.07 * w);
   const p = posAt(g.path, 0);
   g.enemies.push({ id: g.nextId++, type: type, hp: hp, max: hp, d: 0, spd: spd, slow: 0, sf: 1, x: p.x, y: p.y,
@@ -434,7 +446,9 @@ function damage(g, e, d) {
   if (e.dead) return;
   e.hp -= d;
   if (e.hp <= 0) {
-    e.dead = true; const v = Math.max(1, Math.round(e.reward));
+    e.dead = true; let v;
+    if (g.bearT > 0) { g.carry += e.reward * 0.5; v = Math.floor(g.carry); g.carry -= v; }
+    else v = Math.max(1, Math.round(e.reward));
     g.raw += v; g.kills++; if (e.type === "whale") g.whales++;
     g.events.push({ k: "kill", x: e.x, y: e.y, v: v });
   }
@@ -451,8 +465,10 @@ function hitBullet(g, b) {
 function step(g, dt) {
   if (g.over) return;
   g.time += dt;
+  if (g.bearT > 0) g.bearT = Math.max(0, g.bearT - dt);
   if (g.active) {
     g.waveT += dt;
+    if (g.bearAt !== null && g.waveT >= g.bearAt) { g.bearAt = null; g.bearT = 5; g.events.push({ k: "bear" }); }
     while (g.queue.length && g.queue[0].at <= g.waveT) spawn(g, g.queue.shift().type);
   }
   for (let i = 0; i < g.enemies.length; i++) {
@@ -622,18 +638,21 @@ function dayNumber(key) { return Math.max(1, Math.floor((Date.parse(key + "T00:0
     mode = m;
     $("m-daily").setAttribute("aria-pressed", m === "daily" ? "true" : "false");
     $("m-practice").setAttribute("aria-pressed", m === "practice" ? "true" : "false");
+    $("m-practice").textContent = m === "practice" ? "New map" : "Practice";
+    $("m-practice").setAttribute("aria-label", m === "practice" ? "New random practice map" : "Practice mode");
     if (m === "practice") pracSeed = String(Math.floor(Math.random() * 1e9));
     newRun();
   }
   function newMap() { pracSeed = String(Math.floor(Math.random() * 1e9)); newRun(); }
   $("m-daily").addEventListener("click", function () { if (mode !== "daily") setMode("daily"); else newRun(); });
-  $("m-practice").addEventListener("click", function () { if (mode !== "practice") setMode("practice"); });
+  $("m-practice").addEventListener("click", function () { if (mode !== "practice") setMode("practice"); else newMap(); });
 
   // ---------- HUD and controls ----------
   function setText(e, txt) { if (e.textContent !== String(txt)) e.textContent = txt; }
   function updateHud(force) {
     setText($("h-lives").querySelector("b"), g.lives);
     setText($("h-raw").querySelector("b"), g.raw);
+    $("h-raw").classList.toggle("bear", g.bearT > 0);
     setText($("h-wave").querySelector("b"), g.wave);
     if (force || shownRaw !== g.raw) { shownRaw = g.raw; refreshAfford(); }
   }
@@ -650,7 +669,7 @@ function dayNumber(key) { return Math.max(1, Math.floor((Date.parse(key + "T00:0
   }
   function renderControls() {
     const wb = $("wave");
-    if (g.over) { wb.disabled = false; wb.textContent = "Play again"; }
+    if (g.over) { wb.disabled = false; wb.textContent = mode === "practice" ? "New map" : "Play again"; }
     else {
       wb.disabled = g.active;
       wb.textContent = g.active ? "Wave " + g.wave + " running" : (autoT > 0 && auto && g.wave > 0 ? "Wave " + (g.wave + 1) + " in " + Math.ceil(autoT) + "s" : "Start wave " + (g.wave + 1));
@@ -688,7 +707,7 @@ function dayNumber(key) { return Math.max(1, Math.floor((Date.parse(key + "T00:0
     toastMsg = toastMsg || { text: "DAILY GOAL DONE", t: 2.4 };
   }
   function togglePause() { if (g.over) return; paused = !paused; renderControls(); }
-  $("wave").addEventListener("click", function () { if (g.over) newRun(); else callWave(); });
+  $("wave").addEventListener("click", function () { if (g.over) { if (mode === "practice") newMap(); else newRun(); } else callWave(); });
   $("speed").addEventListener("click", function () { speed = speed === 1 ? 2 : speed === 2 ? 3 : 1; renderControls(); });
   $("pause").addEventListener("click", togglePause);
   $("auto").addEventListener("click", function () { auto = !auto; autoT = 0; renderControls(); });
@@ -842,7 +861,8 @@ function dayNumber(key) { return Math.max(1, Math.floor((Date.parse(key + "T00:0
   // ---------- main loop ----------
   function handleEvents() {
     g.events.forEach(function (ev) {
-      if (ev.k === "kill") floats.push({ x: ev.x, y: ev.y - 8, txt: "+" + ev.v, col: C["--gold"], t: 0.7 });
+      if (ev.k === "kill") { if (ev.v > 0) floats.push({ x: ev.x, y: ev.y - 8, txt: "+" + ev.v, col: g.bearT > 0 ? C["--bad"] : C["--gold"], t: 0.7 }); }
+      else if (ev.k === "bear") banner = { text: "BEAR MARKET", t: 1.8, bad: true };
       else if (ev.k === "boom") booms.push({ x: ev.x, y: ev.y, r: ev.r, t: 0.25 });
       else if (ev.k === "leak") { floats.push({ x: ev.x, y: Math.min(H - 20, ev.y), txt: "-" + ev.v, col: C["--bad"], t: 0.9 }); }
       else if (ev.k === "clear") {
@@ -861,7 +881,8 @@ function dayNumber(key) { return Math.max(1, Math.floor((Date.parse(key + "T00:0
     $("o-text").textContent = "You stopped " + g.kills + " enemies. " +
       (mode === "daily" ? "Today's best is wave " + best + ". " + (goalDone ? "Daily goal done. Streak: " + currentStreak() + "." : "Reach wave 5 to keep your streak.") : "Practice runs don't affect your streak.");
     $("o-status").textContent = "";
-    $("o-newmap").hidden = mode !== "practice";
+    $("o-retry").hidden = mode !== "practice";
+    $("o-again").textContent = mode === "practice" ? "New random map" : "Try again";
     overDismissed = false; renderControls(); renderInfo();
   }
   function frame(now) {
@@ -966,8 +987,16 @@ function dayNumber(key) { return Math.max(1, Math.floor((Date.parse(key + "T00:0
     floats.forEach(function (f) { ctx.globalAlpha = Math.max(0, Math.min(1, f.t / 0.4)); ctx.fillStyle = f.col; ctx.fillText(f.txt, f.x, f.y); });
     ctx.globalAlpha = 1;
     if (banner) {
-      ctx.globalAlpha = Math.min(1, banner.t / 0.4); ctx.fillStyle = C["--accent"]; ctx.font = "800 26px Sora,sans-serif";
+      ctx.globalAlpha = Math.min(1, banner.t / 0.4); ctx.fillStyle = banner.bad ? C["--bad"] : C["--accent"]; ctx.font = "800 26px Sora,sans-serif";
       ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(banner.text, W / 2, 110); ctx.globalAlpha = 1;
+    }
+    if (g.bearT > 0) {
+      ctx.globalAlpha = 0.5 + 0.25 * Math.sin(g.time * 8); ctx.strokeStyle = C["--bad"]; ctx.lineWidth = 4; ctx.strokeRect(2, 2, W - 4, H - 4);
+      const label = "BEAR MARKET · KILLS PAY HALF · " + Math.ceil(g.bearT) + "s";
+      ctx.font = "800 11px 'JetBrains Mono',monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const tw = ctx.measureText(label).width + 16;
+      ctx.globalAlpha = 0.7; ctx.fillStyle = "#000"; ctx.fillRect(W / 2 - tw / 2, 16, tw, 18);
+      ctx.globalAlpha = 1; ctx.fillStyle = C["--bad"]; ctx.fillText(label, W / 2, 25);
     }
     if (toastMsg) {
       ctx.globalAlpha = Math.min(1, toastMsg.t / 0.4); ctx.fillStyle = C["--gold"]; ctx.font = "800 14px 'JetBrains Mono',monospace";
@@ -979,8 +1008,8 @@ function dayNumber(key) { return Math.max(1, Math.floor((Date.parse(key + "T00:0
   // ---------- game over: share, tip ----------
   function copyText(text, ok, fail) { try { navigator.clipboard.writeText(text).then(ok, fail); } catch (e) { fail(); } }
   function shareUrl() { return location.href.split("#")[0].split("?")[0]; }
-  $("o-again").addEventListener("click", function () { newRun(); });
-  $("o-newmap").addEventListener("click", newMap);
+  $("o-again").addEventListener("click", function () { if (mode === "practice") newMap(); else newRun(); });
+  $("o-retry").addEventListener("click", function () { newRun(); });
   $("o-share").addEventListener("click", function () {
     const head = mode === "daily" ? "Feeless Defence #" + dayNumber(dateKey()) + " (" + g.mod.name + ")" : "Feeless Defence practice";
     const msg = head + ": held the ledger to wave " + g.wave + " (" + g.kills + " stopped). Can you beat it? " + shareUrl();
